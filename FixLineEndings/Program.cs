@@ -92,7 +92,10 @@ namespace FixLineEndings
                     new_bytes[new_bytes_index++] = bytes[bytes_start_index++];
 
                     if (((bytes.Length - bytes_start_index) & 1) != 0)
+                    {
+                        Console.WriteLine("Corrupted UTF-16 file. Content is not multiple of two");
                         return Result.CorruptedUtf16NotMultipleOfTwo;
+                    }
 
                     break;
             }
@@ -198,9 +201,7 @@ namespace FixLineEndings
 
             if (dry)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"[{fileEncoding}] Needs to be fixed: {filename}");
-                Console.ForegroundColor = ConsoleColor.Gray;
                 return Result.NeedToBeFixed;
             }
 
@@ -227,14 +228,29 @@ namespace FixLineEndings
             if (retain_modified_date)
                 new FileInfo(filename).LastWriteTimeUtc = lastWriteTimeUtc;
 
-            Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine($"[{fileEncoding}] Fixed: {filename}");
-            Console.ForegroundColor = ConsoleColor.Gray;
             return Result.Fixed;
         }
 
         static int Main(string[] args)
             => (int)SubMain(args);
+
+        static bool IsValidTextCharacter(byte value)
+        {
+            if (value >= 0x20 &&
+                value <= 0x7e)
+                return true;
+
+            switch (value)
+            {
+                case (byte)'\r':
+                case (byte)'\n':
+                case (byte)'\t':
+                    return true;
+            }
+
+            return false;
+        }
 
         static FileEncoding DetermineEncoding(byte[] bytes, int offset, int length)
         {
@@ -255,10 +271,8 @@ namespace FixLineEndings
                     return FileEncoding.Utf16LittleEndian;
             }
 
-            //if (bytes[0] < 0x20 ||
-            //    bytes[0] > 0xa0)
-            //    return FileEncoding.UnknownTextFileBOM;
-
+            if (!IsValidTextCharacter(bytes[0]))
+                return FileEncoding.UnknownTextFileBOM;
 
             return FileEncoding.Ansi;
         }
